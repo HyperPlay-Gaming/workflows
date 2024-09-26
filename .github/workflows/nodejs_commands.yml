@@ -44,19 +44,19 @@ jobs:
       group: ${{ inputs.name }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
           token: ${{ secrets.pat }}
         if: ${{ inputs.checkout_recursive }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: ${{ !inputs.checkout_recursive }}
       # pnpm has to be added before setup node https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md#caching-packages-data
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
           version: latest
         if: ${{ inputs.pkg_manager }} == 'pnpm'
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version }}
           cache: ${{ inputs.pkg_manager }}
