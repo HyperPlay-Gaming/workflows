@@ -1,0 +1,67 @@
+name: Check Version Bump
+
+on:
+  workflow_call:
+    inputs:
+      file_path:
+        required: false
+        type: string
+        default: "./package.json"
+      skip_comment:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Get current version from package.json
+        id: get_current_version
+        run: echo "current_version=$(node -p "require('${{ inputs.file_path }}').version")" >> $GITHUB_OUTPUT
+
+      - name: Checkout base branch
+        run: git checkout ${{ github.event.pull_request.base.sha }}
+
+      - name: Get previous version from package.json
+        id: get_previous_version
+        run: echo "previous_version=$(node -p "require('${{ inputs.file_path }}').version")" >> $GITHUB_OUTPUT
+
+      - name: Compare versions
+        id: compare_versions
+        env:
+          PREVIOUS_VERSION: ${{ steps.get_previous_version.outputs.previous_version }}
+          CURRENT_VERSION: ${{ steps.get_current_version.outputs.current_version }}
+        run: |
+          if [ "$PREVIOUS_VERSION" == "$CURRENT_VERSION" ]; then
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+          fi
+
+      - name: Comment on PR if version not changed
+        if: ${{ steps.compare_versions.outputs.version_changed == 'false' && inputs.skip_comment == false }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo, number } = context.issue;
+            const packagePath = '${{ inputs.file_path }}';
+            const packageName = packagePath.split('/').pop();
+            
+            github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: number,
+              body: `⚠️ **Version Check Warning** ⚠️\n\nThe version in \`${packageName}\` has not been updated in this pull request.\nCurrent version: \`${{ steps.get_current_version.outputs.current_version }}\`\n\nIf you're making changes that should be published, please update the version according to [semver](https://semver.org/) guidelines.`
+            });
